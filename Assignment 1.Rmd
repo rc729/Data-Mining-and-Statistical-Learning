@@ -1,0 +1,112 @@
+---
+title: "Linear Regression"
+author: "Roger Cheng (rc729)"
+date: "9/20/2018"
+output: word_document
+---
+
+**Question 5**
+a) Which of the predictors are quantitative, and which are qualitative? 
+```{r}
+library(ISLR)
+Auto$origin <- factor(Auto$origin)
+quantitative_predictors <- sapply(Auto,is.numeric)
+quantitative_predictors
+```
+
+b) What is the range of each quantitative predictor? You can answer
+this using the range() function.
+```{r}
+sapply(Auto[,quantitative_predictors],range)
+
+```
+
+c) What is the mean and standard deviation of each quantitative
+predictor?
+```{r}
+mean = sapply(Auto[, quantitative_predictors], mean)
+sd = sapply(Auto[, quantitative_predictors], sd)
+c(mean,sd)
+```
+
+d) Now remove the 10th through 85th observations. What is the range, mean, and standard deviation of each predictor in the subset of the data that remains?
+```{r}
+data = Auto[-10:-85,]
+data_range = sapply(data[, quantitative_predictors], range)
+data_mean = sapply(data[, quantitative_predictors], mean)
+data_sd = sapply(data[, quantitative_predictors], sd)
+output <- rbind(data_range, data_mean, data_sd)
+output
+```
+
+e) Using the full data set, investigate the predictors graphically,
+using scatterplots or other tools of your choice. Create some plots
+highlighting the relationships among the predictors. Comment
+on your findings.
+```{r}
+pairs(Auto[,quantitative_predictors])
+```
+We can see that there are many linear and non-linear relationships between certain predictors. 
+
+f) Suppose that we wish to predict gas mileage (mpg) on the basis
+of the other variables. Do your plots suggest that any of the
+other variables might be useful in predicting mpg? Justify your
+answer.
+
+Yes, there are many trends that can be seen and suggests that other variables may be useful in predicting. For example, horsepower and mpg show a negative relationship while year and mpg has a positive relationship. ALl variables do seem to show some correlation with mpg.
+
+
+**Question 6**
+a) Fit a multiple regression model to predict Sales using Price, Urban, and US.
+```{r}
+data(Carseats)
+model <- lm(Sales~Price+Urban+US, data = Carseats)
+summary(model)
+```
+
+b) Provide an interpretation of each coefficient in the model. Be careful–some of the variables
+in the model are qualitative
+
+*Intercept*: The base value of sales if all predictors are 0. May not have any real meaning to it because all predictors could possibly never all be 0. Also could be outside of data range and is an unnecessary extrapolation.
+*Price*: A Price increase of 1 dollar would result in an average decrease of 54.459 units in sales holding all other predictors fixed.
+*Urban*: The average unit of sales in Urban areas are 21.916 less than in rural areas holding all other predictors fixed.
+*US*: The average unit of sales in the US is 1200.573 higher than that in non-US stores holding all other predictors fixed.
+
+c) Write out the model in equation form, being careful to handle the qualitative variables
+properly
+
+$$Sales = 13.043469 - 0.054459Price - 0.021916Urban + 1.200573US + \varepsilon$$
+
+d) For which of the predictors can you reject the null hypothesis $H_0 : βj = 0$? Use the
+significance level 0.05 for the hypothesis test.
+
+We can reject the null for the predictors Price and US.
+
+e) On the basis of your response to question (d), fit a smaller model that only uses the
+predictors for which there is evidence of association with the outcome.
+```{r}
+smaller_model <- lm(Sales~Price+US, data = Carseats)
+summary(smaller_model)
+```
+
+f) What are the value of R2 for models in (a) and (e)? Does larger R2 mean the model fit
+the data better?
+```{r}
+summary(model)$r.squared
+summary(smaller_model)$r.squared
+```
+
+g) Using the model from (e), obtain 95 % confidence intervals for the coefficient(s).
+```{r}
+confint(smaller_model)
+```
+
+h) Fit linear regression models in (e) with interaction effects. Provide an interpretation of
+each coefficient in the model.
+```{r}
+interaction_model <- lm(Sales~Price + US + (Price*US), data=Carseats)
+summary(interaction_model)
+```
+
+*Price*: If sales are not in the US, for each unit increase in Price, Sales will decrease on average by 53.986. If in the US, it will decrease by (-53.986 -0.835).
+*US*: The average sales would change by (1295.775 - 0.835 * Price) if in the US.
