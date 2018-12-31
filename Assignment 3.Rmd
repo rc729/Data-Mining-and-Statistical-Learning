@@ -1,0 +1,146 @@
+---
+title: "Splines, RF, Bagging"
+author: "Roger Cheng (rc729)"
+date: "12/3/2018"
+output: word_document
+---
+
+### Problem 1 ###
+```{r}
+## Read Data ##
+library(readxl)
+library(splines)
+data <- read.csv("Advertising.csv")
+attach(data)
+
+polymse <- c()
+stepmse <- c()
+cubsplinemse <- c()
+natsplinemse <- c()
+smoothsplinemse <- c()
+
+set.seed(1)
+train <- sample(1:200,100)
+traindata <- data[train,]
+testdata <- data[-train,]
+
+for(i in 1:50) {
+    ## Create train and test set ##
+    set.seed(i)
+    train <- sample(1:200,100)
+    traindata <- data[train,]
+    testdata <- data[-train,]
+    
+    ## Polynomial Regression with degree 4 ##
+    poly.fit <- lm(sales~poly(TV,4), data = traindata)
+    pred <- predict(poly.fit, testdata)
+    poly.testmse <- mean((testdata$sales - pred)^2) ## Test MSE
+    polymse <- c(polymse, poly.testmse)
+    
+    ## Step Function with 3 equidistant knots ##
+    breaks_3 = min(traindata$TV) + (max(traindata$TV) - min(traindata$TV))/4*(0:4)
+    breaks_3[1] <- -Inf
+    breaks_3[length(breaks_3)] <- Inf
+    step.fit <- lm(sales~cut(TV, breaks = breaks_3), data = traindata)
+    pred2 <- predict(step.fit, data.frame(TV = testdata$TV))
+    step.testmse <- mean((testdata$sales - pred2)^2) ## Test MSE
+    stepmse <- c(stepmse, step.testmse)
+    
+    ## Cubic Splines with 5 degrees of freedom ##
+    spline.fit <- lm(sales~bs(TV, df=5), data = traindata)
+    pred3 <- predict(spline.fit, testdata)
+    spline.testmse <- mean((testdata$sales - pred3)^2) ## Test MSE
+    cubsplinemse <- c(cubsplinemse,spline.testmse)
+    
+    ## Natural Cubis Splines with 5 degrees of freedom ##
+    nspline.fit <- lm(sales~ns(TV, df=5), data = traindata)
+    pred4 <- predict(nspline.fit, testdata)
+    nspline.testmse <- mean((testdata$sales - pred4)^2) ## Test MSE
+    natsplinemse <- c(natsplinemse, nspline.testmse)
+    
+    ## Smoothing Splines with 5 degrees of freedom ##
+    smoothspline.fit=smooth.spline(traindata$TV,traindata$sales,df=5)
+    pred5 <- predict(smoothspline.fit, testdata$TV)
+    smoothspline.testmse <- mean((testdata$sales - pred5$y)^2) ## Test MSE
+    smoothsplinemse <- c(smoothsplinemse,smoothspline.testmse)
+}
+
+boxplot(polymse, stepmse, cubsplinemse, natsplinemse,smoothsplinemse,
+        names = c("polymse", "stepmse", "cubsplinemse", "natspline", "smoothspline"))
+```
+
+### Problem 2 ### 
+In boosting we fit to the residuals of the previous models. Each stump is a split of one variable so with B different stumps they can be grouped into terms for splits by each predictor. Then by adding at each step we can get the form $f(X) = \sum_{j = 1}^p f_j(X_j)$ making it an additive model.
+
+### Problem 4 ###
+Part A
+```{r}
+library(ISLR)
+attach(Carseats)
+set.seed(1)
+train <- sample(1:nrow(Carseats), .5*nrow(Carseats))
+traindata <- Carseats[train,]
+testdata <- Carseats[-train,]
+```
+
+Part B
+```{r}
+library(tree)
+tree.carseats <- tree(Sales~., data = traindata)
+summary(tree.carseats)
+plot(tree.carseats)
+text(tree.carseats, pretty = 0)
+tree.pred <- predict(tree.carseats, testdata)
+tree.error <- mean((testdata$Sales - tree.pred)^2)
+tree.error
+```
+
+The test error rate is 4.148897.
+
+Part C
+```{r}
+set.seed(1)
+cv.carseats <- cv.tree(tree.carseats)
+plot(cv.carseats$size,cv.carseats$dev,type="b")
+prune.carseats <- prune.tree(tree.carseats, best = 8)
+plot(prune.carseats)
+text(prune.carseats, pretty=0)
+prune.pred <- predict(prune.carseats, testdata)
+prune.error <- mean((testdata$Sales - prune.pred)^2)
+prune.error
+```
+
+We can see that pruning the tree to the size selected by cross-validation gives us an increase in test MSE.
+
+Part D
+```{r}
+set.seed(1)
+library(randomForest)
+bag.carseats <- randomForest(Sales~., data = traindata, mtry=10, importance = TRUE)
+bag.pred <- predict(bag.carseats, testdata)
+bag.error <- mean((testdata$Sales - bag.pred)^2)
+bag.error
+importance(bag.carseats)
+```
+
+Seems like ShelveLoc and Price are the two most important variables.
+
+Part E
+```{r}
+rferrors <- c()
+for(i in 3:10) {
+    rf.carseats <- randomForest(Sales~., data = traindata, mtry = i, importance = TRUE)
+    rf.pred <- predict(rf.carseats, testdata)
+    rf.error <- mean((testdata$Sales - rf.pred)^2)
+    rferrors <- c(rferrors,rf.error)
+}
+rferrors
+importance(rf.carseats)
+```
+
+We can see that Price and ShelvLoc are still the two most important. As m increases, the error rate decreases until all variables are included and we reach the error rate obtained when doing bagging.
+
+
+
+
+

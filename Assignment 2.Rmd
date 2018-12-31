@@ -1,0 +1,233 @@
+---
+title: "LDA, QDA, Bootstrapping"
+author: "Roger Cheng (rc729)"
+date: "10/23/2018"
+output: word_document
+---
+
+### Problem 1 ###
+# Part 1 #
+```{r}
+library(ISLR)
+data = Default
+fit.model <- glm(default ~ income + balance, data = Default, family = "binomial")
+summary(fit.model)
+```
+
+# Part 2 #
+```{r}
+set.seed(1)
+train <- sample(nrow(data), .5*nrow(data))
+fit.glm <- glm(default ~ income + balance, data = Default, family = "binomial", subset = train)
+summary(fit.glm)
+vals <- predict(fit.model, newdata = Default[-train, ], type = "response")
+pred.model <- rep("No", length(vals))
+pred.model[vals > 0.5] <- "Yes"
+mean(pred.model != Default[-train, ]$default)
+```
+
+Validation set error rate is 2.84%.
+
+# Part 3 #
+```{r}
+for(i in 1:3) {
+    set.seed(i)
+    train <- sample(nrow(data), .5*nrow(data))
+    #train
+    fit.glm <- glm(default ~ income + balance, data = Default, family = "binomial", subset = train)
+    summary(fit.glm)
+    vals <- predict(fit.model, newdata = Default[-train, ], type = "response")
+    pred.model <- rep("No", length(vals))
+    pred.model[vals > 0.5] <- "Yes"
+    print(mean(pred.model != Default[-train, ]$default))
+}
+
+```
+
+The validation set error rate is 2.84%, 2.72%, and 2.48% respectively. From these results we can see that the estimate of the error rate is variable most likely due to the fact that it depends on which observations are included in training and which are included in validation. 
+
+# Part 4 #
+```{r}
+for (x in 1:3){
+    set.seed(x)
+    train <- sample(nrow(data), .5*nrow(data))
+    fit.model <- glm(default ~ income + balance + student, 
+                     data = Default, family = "binomial", subset = train)
+    vals <- predict(fit.model, newdata = Default[-train, ], type = "response")
+    pred.model <- rep("No", length(vals))
+    pred.model[vals > 0.5] <- "Yes"
+    print(mean(pred.model != Default[-train, ]$default))
+}
+```
+It seems that adding the dummy variable does not reduce the validation estimate of the test error rate.
+
+# Part 5 #
+```{r}
+library(boot)
+set.seed(1)
+glm.fit=glm(default ~ income + balance,data=Default, family = "binomial")
+cv.err=cv.glm(Default,glm.fit,K=5)
+cv.err$delta[1]
+glm.fit=glm(default ~ income + balance+student,data=Default, family = "binomial")
+cv.err=cv.glm(Default,glm.fit,K=5)
+cv.err$delta[1]
+```
+After using 5-fold cross validation, we can see that the test error rate barely changes if the dummy variable, student, was included in the model.
+
+### Problem 2 ###
+```{r}
+data(Auto)
+attach(Auto)
+med <- median(mpg)
+mpg01 <- c()
+for(i in Auto[,1]) {
+    if(i > med) { mpg01 <- c(mpg01, 1) }
+    else { mpg01 <- c(mpg01, 0) }
+}
+Auto$mpg01 <- mpg01
+```
+
+# Part B #
+```{r}
+boxplot(horsepower ~ mpg01, data = Auto)
+boxplot(displacement ~ mpg01, data = Auto)
+boxplot(weight ~ mpg01, data = Auto)
+boxplot(acceleration ~ mpg01, data = Auto)
+boxplot(year ~ mpg01, data = Auto)
+cyl <- table(cylinders, mpg01)
+barplot(cyl, beside = T)
+origin <- table(origin, mpg01)
+barplot(origin, beside = T)
+```
+All presented variables (both numerical and categorical) seem to show some trend with mpg01 
+
+# Part C #
+```{r}
+set.seed(1)
+train <- sample(nrow(Auto), .75*nrow(Auto))
+trainset <- Auto[train,]
+testset <- Auto[-train,]
+```
+
+# Part D #
+```{r}
+library(MASS)
+# Used all variables except mpg and name
+fit.model <- lda(mpg01 ~ displacement+horsepower+weight+acceleration+year+cylinders+origin, data=trainset)
+lda.pred <- predict(fit.model, testset)
+table(testset$mpg01, lda.pred$class)
+mean(lda.pred$class!=testset$mpg01)*100
+```
+Test error of LDA is 5.1%.
+
+# Part E #
+```{r}
+fit.model <- qda(mpg01 ~ displacement+horsepower+weight+acceleration+year+cylinders+origin, data=trainset)
+qda.pred <- predict(fit.model, testset)
+table(testset$mpg01, qda.pred$class)
+mean(qda.pred$class!=testset$mpg01)*100
+```
+Test error of QDA is 4.08%
+
+# Part F #
+```{r}
+fit.model <- glm(as.factor(mpg01) ~ displacement+horsepower+weight+acceleration+year+cylinders+origin, data=trainset, family="binomial")
+vals <- predict(fit.model, testset, type="response")
+predictions <- ifelse(vals>0.5, "1", "0")
+table(testset$mpg01, predictions)
+mean(predictions!=testset$mpg01)*100
+```
+Test error of logistic regression is 6.12%.
+
+# Part G #
+```{r}
+library(class)
+train.X <- subset(trainset, select = c("mpg01", "displacement", "horsepower",
+                                "weight", "acceleration", "year",
+                                "cylinders", "origin"))
+test.X <- subset(testset, select = c("mpg01", "displacement", "horsepower",
+                                "weight", "acceleration", "year",
+                                "cylinders", "origin"))
+set.seed(1)
+results <- data.frame("k"=1:10, errors = NA)
+for(k in 1:10){
+  knn.pred <- knn(train.X, test.X, trainset$mpg01, k=k)
+  results$errors[k] <- (mean(knn.pred!=testset$mpg01)*100)
+  }
+results
+```
+From our results we can see that when k=7 we have the smallest test error. Thus k=7 performs the best on this data set.
+
+### Problem 3 ###
+
+# Part A #
+```{r}
+library(MASS)
+attach(Boston)
+mu.hat <- mean(medv)
+mu.hat
+```
+The estimate for the population mean of medv is $\hat{\mu}$ = 22.53281.
+
+# Part B #
+```{r}
+se.hat <- sd(medv) / sqrt(nrow(Boston))
+se.hat
+```
+Estimate of standard error of $\hat{\mu}$ is 0.4088611.
+
+# Part C #
+```{r}
+set.seed(1)
+#define function with parameters data and index to calculate mu
+boot.fn <- function(data, index) {
+    mu <- mean(data[index])
+    return (mu)
+}
+
+boot(medv, boot.fn, 1000)
+```
+The bootstrapped estimated error of $\hat{\mu}$ is 0.4119374 which is very close to what we found in (b).
+
+# Part D #
+```{r}
+t.test(Boston$medv)
+confint.mu.hat <- c(22.53 - 2*0.4119, 22.53 + 2*0.4119)
+confint.mu.hat
+```
+The confidence interval done by bootstrapping is very close to the results of the t.test().
+
+# Part E #
+```{r}
+med.hat <- median(medv)
+med.hat
+```
+$\hat{\mu_{med}}$ = 21.2
+
+# Part F #
+```{r}
+#define bootstrap function again
+boot.fn <- function(data, index) {
+    mu <- median(data[index])
+    return (mu)
+}
+boot(medv, boot.fn, 1000)
+```
+We get an estimated $\hat{\mu_{med}}$ of 21.2 which is exactly equal to what we got in (e). 
+
+# Part G #
+```{r}
+tenthpercentile.hat <- quantile(medv, c(0.1))
+tenthpercentile.hat
+```
+$\hat{\mu_{0.1}}$ = 12.75
+
+# Part H #
+```{r}
+boot.fn <- function(data, index) {
+    mu <- quantile(data[index], c(0.1))
+    return (mu)
+}
+boot(medv, boot.fn, 1000)
+```
+We get an estimated $\hat{\mu_{0.1}}$ of 12.75 which is exactly equal to what we got in (g). 
